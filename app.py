@@ -1,5 +1,16 @@
 import streamlit as st
 
+from pathlib import Path
+
+APP_ROOT = Path(__file__).parent
+
+def resolve_src(src: str) -> str:
+    """URL이면 그대로, 로컬이면 백슬래시→슬래시 변환 후 앱 루트 기준 절대경로로 변환."""
+    if isinstance(src, str) and src.startswith(("http://", "https://")):
+        return src
+    # 백슬래시를 슬래시로 바꾸고, 앱 루트 기준으로 합치기
+    p = (APP_ROOT / src.replace("\\", "/")).resolve()
+    return str(p)
 # ---------------------------------------------
 # 기본 설정
 # ---------------------------------------------
@@ -246,19 +257,22 @@ while i < len(content):
 
             # 1-1) 미디어 렌더
             if block["type"] == "image":
-                st.image(block["src"], use_container_width=True, caption=block.get("caption", ""))
+
+
+                src = resolve_src(block["src"])
+                st.image(src, use_container_width=True, caption=block.get("caption", ""))
+                
             elif block["type"] == "video":
-                src = block["src"]
-                if isinstance(src, str) and src.startswith(("http://", "https://")):
+                with st.container():
+                    st.markdown("<div class='block'>", unsafe_allow_html=True)
+                    src = resolve_src(block["src"])
+
+                    # URL이든 로컬이든 정규화된 문자열을 그대로 전달
                     st.video(src, start_time=0)
-                else:
-                    try:
-                        with open(src, "rb") as f:
-                            st.video(f.read(), start_time=0)
-                    except FileNotFoundError:
-                        st.warning(f"동영상을 찾을 수 없습니다: {src}")
-                if block.get("caption"):
-                    st.caption(block["caption"])
+
+                    if block.get("caption"):
+                        st.caption(block["caption"])
+                    st.markdown("</div>", unsafe_allow_html=True)
 
             # 1-2) 다음 블록이 text면 같은 group에 함께 렌더
             if i + 1 < len(content) and content[i + 1]["type"] == "text":
